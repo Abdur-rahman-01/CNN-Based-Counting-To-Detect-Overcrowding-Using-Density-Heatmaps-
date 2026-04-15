@@ -1,0 +1,167 @@
+image,true_count,pred_count,error
+Custom metro dataset 2026-03-30 001150.png,86,8,78
+Custom metro dataset 2026-03-30 001657.png,36,13,23
+Custom metro dataset 2026-03-30 001932.png,21,15,6
+Custom metro dataset 2026-03-30 002037.png,23,10,13
+Custom metro dataset 2026-03-30 002249.png,66,11,55
+Custom metro dataset 2026-03-30 002313.png,58,22,36
+Custom metro dataset 2026-03-30 003200.png,48,13,35
+Custom metro dataset 2026-03-30 003416.png,34,12,22
+Custom metro dataset 2026-03-30 003450.png,24,14,10
+Custom metro dataset 2026-03-30 003553.png,11,8,3
+Custom metro dataset 2026-03-30 003616.png,58,6,52
+Custom metro dataset 2026-03-30 003624.png,69,8,61
+Custom metro dataset 2026-03-30 013249.png,180,0,180
+Custom metro dataset 2026-03-30 023034.png,8,9,1
+Custom metro dataset 2026-03-30 023052.png,11,13,2
+Custom metro dataset 2026-03-30 023136.png,32,18,14
+Custom metro dataset 2026-03-30 023207.png,3,3,0
+China Dataset_processed_IMG_103.jpg,43,1,42
+China Dataset_processed_IMG_127.jpg,141,2,139
+China Dataset_processed_IMG_128.jpg,1455,0,1455
+China Dataset_processed_IMG_129.jpg,255,13,242
+China Dataset_processed_IMG_13.jpg,388,10,378
+China Dataset_processed_IMG_130.jpg,1177,0,1177
+China Dataset_processed_IMG_133.jpg,826,0,826
+China Dataset_processed_IMG_135.jpg,353,0,353
+China Dataset_processed_IMG_14.jpg,378,1,377
+China Dataset_processed_IMG_140.jpg,357,8,349
+China Dataset_processed_IMG_147.jpg,369,1,368
+China Dataset_processed_IMG_15.jpg,164,11,153
+China Dataset_processed_IMG_154.jpg,210,0,210
+China Dataset_processed_IMG_157.jpg,33,26,7
+China Dataset_processed_IMG_16.jpg,160,7,153
+China Dataset_processed_IMG_160.jpg,225,13,212
+China Dataset_processed_IMG_161.jpg,81,29,52
+China Dataset_processed_IMG_163.jpg,456,12,444
+China Dataset_processed_IMG_168.jpg,914,1,913
+China Dataset_processed_IMG_171.jpg,1407,1,1406
+China Dataset_processed_IMG_176.jpg,422,7,415
+China Dataset_processed_IMG_178.jpg,1155,9,1146
+China Dataset_processed_IMG_186.jpg,1655,0,1655
+China Dataset_processed_IMG_190.jpg,270,13,257
+China Dataset_processed_IMG_192.jpg,77,32,45
+China Dataset_processed_IMG_196.jpg,580,0,580
+China Dataset_processed_IMG_2.jpg,707,0,707
+China Dataset_processed_IMG_207.jpg,131,11,120
+China Dataset_processed_IMG_211.jpg,187,6,181
+China Dataset_processed_IMG_213.jpg,247,6,241
+China Dataset_processed_IMG_216.jpg,84,15,69
+China Dataset_processed_IMG_220.jpg,304,4,300
+China Dataset_processed_IMG_223.jpg,274,2,272
+China Dataset_processed_IMG_225.jpg,476,0,476
+China Dataset_processed_IMG_235.jpg,189,11,178
+China Dataset_processed_IMG_24.jpg,159,5,154
+China Dataset_processed_IMG_243.jpg,122,7,115
+China Dataset_processed_IMG_244.jpg,199,1,198
+China Dataset_processed_IMG_246.jpg,373,1,372
+China Dataset_processed_IMG_251.jpg,1205,6,1199
+China Dataset_processed_IMG_252.jpg,254,12,242
+China Dataset_processed_IMG_256.jpg,38,9,29
+China Dataset_processed_IMG_257.jpg,274,15,259
+China Dataset_processed_IMG_267.jpg,1162,6,1156
+China Dataset_processed_IMG_268.jpg,3137,0,3137
+China Dataset_processed_IMG_27.jpg,774,1,773
+China Dataset_processed_IMG_271.jpg,271,3,268
+China Dataset_processed_IMG_273.jpg,362,18,344
+China Dataset_processed_IMG_274.jpg,105,16,89
+China Dataset_processed_IMG_28.jpg,814,0,814
+China Dataset_processed_IMG_280.jpg,248,3,245
+China Dataset_processed_IMG_297.jpg,619,10,609
+China Dataset_processed_IMG_30.jpg,622,3,619
+China Dataset_processed_IMG_36.jpg,135,14,121
+China Dataset_processed_IMG_37.jpg,417,0,417
+China Dataset_processed_IMG_39.jpg,410,15,395
+China Dataset_processed_IMG_40.jpg,129,2,127
+China Dataset_processed_IMG_42.jpg,143,15,128
+China Dataset_processed_IMG_51.jpg,569,11,558
+China Dataset_processed_IMG_53.jpg,257,14,243
+China Dataset_processed_IMG_54.jpg,506,8,498
+China Dataset_processed_IMG_57.jpg,301,8,293
+China Dataset_processed_IMG_59.jpg,260,10,250
+China Dataset_processed_IMG_69.jpg,367,0,367
+China Dataset_processed_IMG_71.jpg,553,6,547
+China Dataset_processed_IMG_77.jpg,138,16,122
+China Dataset_processed_IMG_81.jpg,297,1,296
+China Dataset_processed_IMG_84.jpg,2143,10,2133
+China Dataset_processed_IMG_89.jpg,244,14,230
+China Dataset_processed_IMG_9.jpg,188,16,172
+China Dataset_processed_IMG_92.jpg,2649,0,2649
+China Dataset_processed_IMG_94.jpg,2229,0,2229
+China Dataset_processed_IMG_97.jpg,221,0,221
+China Dataset_processed_IMG_99.jpg,431,1,430
+China Dataset B_processed_IMG_1.jpg,232,15,217
+China Dataset B_processed_IMG_100.jpg,206,17,189
+China Dataset B_processed_IMG_103.jpg,151,18,133
+China Dataset B_processed_IMG_11.jpg,138,24,114
+China Dataset B_processed_IMG_114.jpg,87,23,64
+China Dataset B_processed_IMG_122.jpg,43,24,19
+China Dataset B_processed_IMG_128.jpg,40,18,22
+China Dataset B_processed_IMG_129.jpg,145,17,128
+China Dataset B_processed_IMG_137.jpg,229,19,210
+China Dataset B_processed_IMG_139.jpg,58,20,38
+China Dataset B_processed_IMG_144.jpg,26,18,8
+China Dataset B_processed_IMG_150.jpg,99,21,78
+China Dataset B_processed_IMG_157.jpg,261,21,240
+China Dataset B_processed_IMG_158.jpg,11,18,7
+China Dataset B_processed_IMG_159.jpg,135,19,116
+China Dataset B_processed_IMG_161.jpg,48,27,21
+China Dataset B_processed_IMG_169.jpg,108,24,84
+China Dataset B_processed_IMG_170.jpg,150,23,127
+China Dataset B_processed_IMG_173.jpg,42,29,13
+China Dataset B_processed_IMG_174.jpg,173,22,151
+China Dataset B_processed_IMG_178.jpg,60,25,35
+China Dataset B_processed_IMG_18.jpg,177,16,161
+China Dataset B_processed_IMG_187.jpg,125,19,106
+China Dataset B_processed_IMG_19.jpg,43,28,15
+China Dataset B_processed_IMG_192.jpg,63,21,42
+China Dataset B_processed_IMG_2.jpg,152,14,138
+China Dataset B_processed_IMG_205.jpg,103,18,85
+China Dataset B_processed_IMG_212.jpg,108,27,81
+China Dataset B_processed_IMG_226.jpg,94,26,68
+China Dataset B_processed_IMG_228.jpg,117,19,98
+China Dataset B_processed_IMG_230.jpg,140,19,121
+China Dataset B_processed_IMG_231.jpg,413,25,388
+China Dataset B_processed_IMG_237.jpg,105,21,84
+China Dataset B_processed_IMG_240.jpg,68,29,39
+China Dataset B_processed_IMG_253.jpg,45,28,17
+China Dataset B_processed_IMG_267.jpg,137,18,119
+China Dataset B_processed_IMG_279.jpg,62,18,44
+China Dataset B_processed_IMG_28.jpg,96,30,66
+China Dataset B_processed_IMG_283.jpg,117,23,94
+China Dataset B_processed_IMG_296.jpg,123,21,102
+China Dataset B_processed_IMG_303.jpg,295,23,272
+China Dataset B_processed_IMG_309.jpg,54,14,40
+China Dataset B_processed_IMG_311.jpg,142,18,124
+China Dataset B_processed_IMG_313.jpg,41,23,18
+China Dataset B_processed_IMG_315.jpg,344,22,322
+China Dataset B_processed_IMG_316.jpg,35,22,13
+China Dataset B_processed_IMG_319.jpg,55,30,25
+China Dataset B_processed_IMG_321.jpg,166,19,147
+China Dataset B_processed_IMG_323.jpg,53,17,36
+China Dataset B_processed_IMG_341.jpg,67,20,47
+China Dataset B_processed_IMG_344.jpg,71,31,40
+China Dataset B_processed_IMG_346.jpg,87,30,57
+China Dataset B_processed_IMG_347.jpg,32,26,6
+China Dataset B_processed_IMG_358.jpg,86,27,59
+China Dataset B_processed_IMG_365.jpg,74,23,51
+China Dataset B_processed_IMG_366.jpg,44,27,17
+China Dataset B_processed_IMG_37.jpg,115,26,89
+China Dataset B_processed_IMG_374.jpg,130,26,104
+China Dataset B_processed_IMG_376.jpg,50,17,33
+China Dataset B_processed_IMG_383.jpg,51,21,30
+China Dataset B_processed_IMG_393.jpg,191,29,162
+China Dataset B_processed_IMG_399.jpg,169,34,135
+China Dataset B_processed_IMG_47.jpg,93,29,64
+China Dataset B_processed_IMG_48.jpg,89,24,65
+China Dataset B_processed_IMG_68.jpg,114,27,87
+China Dataset B_processed_IMG_76.jpg,32,23,9
+China Dataset B_processed_IMG_77.jpg,217,21,196
+China Dataset B_processed_IMG_80.jpg,87,30,57
+China Dataset B_processed_IMG_82.jpg,30,29,1
+China Dataset B_processed_IMG_86.jpg,22,28,6
+China Dataset B_processed_IMG_9.jpg,166,14,152
+,,,
+MAE,283.23,,
+MSE,547.35,,
+Under-detection rate,85.80%,,

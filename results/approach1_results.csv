@@ -1,0 +1,4 @@
+metric,value
+accuracy,86.4
+misclassification_rate,13.6
+estimated_mae,7.1
