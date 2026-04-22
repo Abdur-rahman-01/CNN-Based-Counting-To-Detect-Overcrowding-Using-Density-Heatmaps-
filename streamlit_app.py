@@ -1,474 +1,332 @@
+"""
+app.py — Crowd Density Estimation | Indian Metro
+CSRNet Fine-tuned · MAE = 12.36
+
+Two input modes:
+  1. Sample Gallery  — picks from my_data/val/images/ automatically, no renaming needed
+  2. Upload Your Own — drop in any image
+"""
+
 import streamlit as st
 import torch
-import torch.nn as nn
-from torchvision import transforms
-from PIL import Image
 import numpy as np
+from PIL import Image
+from torchvision import transforms
 import cv2
-import matplotlib.pyplot as plt
-import matplotlib
-matplotlib.use('Agg')
-import io
+import os
+import glob
 
-# ── Page config ───────────────────────────────────────────────
+# ── PAGE CONFIG ───────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Metro Crowd Density Estimator",
+    page_title="Crowd Density Estimator — Indian Metro",
     page_icon="🚇",
     layout="wide",
-    initial_sidebar_state="expanded"
 )
 
-# ── Custom CSS ────────────────────────────────────────────────
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-    .main { background-color: #0a0a0f; }
-    .stApp { background: linear-gradient(135deg, #0a0a0f 0%, #111827 100%); }
+# ── PATHS ─────────────────────────────────────────────────────────────────────
+WEIGHTS_PATH = "weights/csrnet_v3_best.pth"
+VAL_DIR      = "my_data/val/images"   # your val images already live here
+SAMPLE_IMAGES = {
+    "Ameerpet — Peak Hour":      "Screenshot 2026-03-30 003200.png",
+    "Raidurg — Platform ":  "Screenshot 2026-03-30 023136.png",
+    "Mumbai Central — Boarding": "Screenshot 2026-03-30 001150.png",
+    "Red Line — Pre-boarding":   "Screenshot 2026-03-30 003624.png",
+    "Metro Corridor — Off-peak": "Screenshot 2026-03-30 013249.png",
+}
 
-    .hero-title {
-        font-size: 2.8rem;
-        font-weight: 700;
-        background: linear-gradient(90deg, #60a5fa, #a78bfa, #34d399);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        text-align: center;
-        padding: 1rem 0 0.2rem 0;
-        line-height: 1.2;
-    }
-    .hero-sub {
-        text-align: center;
-        color: #6b7280;
-        font-size: 1rem;
-        margin-bottom: 2rem;
-        font-weight: 300;
-    }
-    .metric-card {
-        background: rgba(255,255,255,0.04);
-        border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 16px;
-        padding: 1.4rem 1rem;
-        text-align: center;
-        backdrop-filter: blur(10px);
-    }
-    .metric-value { font-size: 2.8rem; font-weight: 700; line-height: 1; }
-    .metric-label {
-        font-size: 0.78rem; color: #9ca3af;
-        text-transform: uppercase; letter-spacing: 0.08em; margin-top: 0.4rem;
-    }
-    .status-normal {
-        background: linear-gradient(135deg, #064e3b, #065f46);
-        border: 1px solid #10b981; border-radius: 12px;
-        padding: 1rem 1.5rem; color: #34d399;
-        font-size: 1.3rem; font-weight: 700;
-        text-align: center; letter-spacing: 0.05em;
-    }
-    .status-moderate {
-        background: linear-gradient(135deg, #78350f, #92400e);
-        border: 1px solid #f59e0b; border-radius: 12px;
-        padding: 1rem 1.5rem; color: #fbbf24;
-        font-size: 1.3rem; font-weight: 700;
-        text-align: center; letter-spacing: 0.05em;
-    }
-    .status-crowded {
-        background: linear-gradient(135deg, #7c2d12, #9a3412);
-        border: 1px solid #f97316; border-radius: 12px;
-        padding: 1rem 1.5rem; color: #fb923c;
-        font-size: 1.3rem; font-weight: 700;
-        text-align: center; letter-spacing: 0.05em;
-    }
-    .status-overcrowded {
-        background: linear-gradient(135deg, #7f1d1d, #991b1b);
-        border: 1px solid #ef4444; border-radius: 12px;
-        padding: 1rem 1.5rem; color: #f87171;
-        font-size: 1.3rem; font-weight: 700;
-        text-align: center; letter-spacing: 0.05em;
-    }
-    .section-header {
-        color: #e5e7eb; font-size: 0.85rem; font-weight: 600;
-        text-transform: uppercase; letter-spacing: 0.1em;
-        margin-bottom: 0.8rem; padding-bottom: 0.4rem;
-        border-bottom: 1px solid rgba(255,255,255,0.08);
-    }
-    .info-box {
-        background: rgba(96,165,250,0.08);
-        border: 1px solid rgba(96,165,250,0.2);
-        border-radius: 10px; padding: 0.8rem 1rem;
-        color: #93c5fd; font-size: 0.85rem; margin-top: 0.5rem;
-    }
-    .sidebar-metric {
-        background: rgba(255,255,255,0.04);
-        border-radius: 10px; padding: 0.6rem 0.8rem;
-        margin: 0.3rem 0; font-size: 0.82rem; color: #d1d5db;
-    }
-    div[data-testid="stFileUploader"] {
-        background: rgba(255,255,255,0.03);
-        border: 2px dashed rgba(96,165,250,0.3);
-        border-radius: 16px; padding: 1rem;
-    }
-    .stButton > button {
-        background: linear-gradient(135deg, #2563eb, #7c3aed);
-        color: white; border: none; border-radius: 10px;
-        padding: 0.6rem 2rem; font-weight: 600; width: 100%;
-    }
-</style>
-""", unsafe_allow_html=True)
+MAX_SAMPLES  = 3                  # max images to show in gallery
 
-# ── Model definition ──────────────────────────────────────────
-def make_layers(cfg, in_channels=3, dilation=False):
-    d_rate = 2 if dilation else 1
-    layers = []
-    for v in cfg:
-        if v == 'M':
-            layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
-        else:
-            conv2d = nn.Conv2d(in_channels, v, kernel_size=3,
-                               padding=d_rate, dilation=d_rate)
-            layers += [conv2d, nn.ReLU(inplace=True)]
-            in_channels = v
-    return nn.Sequential(*layers)
+# ── TRANSFORMS ────────────────────────────────────────────────────────────────
+transform = transforms.Compose([
+    transforms.Resize((512, 512)),
+    transforms.ToTensor(),
+    transforms.Normalize(
+        mean=[0.485, 0.456, 0.406],
+        std =[0.229, 0.224, 0.225]
+    ),
+])
 
-class CSRNet(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.frontend = make_layers(
-            [64,64,'M',128,128,'M',256,256,256,'M',512,512,512])
-        self.backend  = make_layers(
-            [512,512,512,256,128,64], in_channels=512, dilation=True)
-        self.output_layer = nn.Conv2d(64, 1, kernel_size=1)
-    def forward(self, x):
-        x = self.frontend(x)
-        x = self.backend(x)
-        x = self.output_layer(x)
-        return x
-
+# ── MODEL ─────────────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
-    model = CSRNet()
-    model.load_state_dict(torch.load(
-        'weights/csrnet_v3_best.pth', map_location='cpu'))
+    from model import CSRNet
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model  = CSRNet()
+    model.load_state_dict(torch.load(WEIGHTS_PATH, map_location=device))
+    model.to(device)
     model.eval()
-    return model
+    return model, device
 
-# ── Inference ─────────────────────────────────────────────────
-def run_inference(image: Image.Image, model):
-    transform = transforms.Compose([
-        transforms.Resize((512, 512)),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485,0.456,0.406],
-                             [0.229,0.224,0.225])
-    ])
-    tensor = transform(image).unsqueeze(0)
+# ── HELPERS ───────────────────────────────────────────────────────────────────
+def predict(model, device, pil_img):
+    tensor = transform(pil_img).unsqueeze(0).to(device)
     with torch.no_grad():
-        density_map = model(tensor).squeeze().numpy()
-    density_map = np.maximum(density_map, 0)   # clamp negatives
-    count = max(0, int(density_map.sum()))      # never show negative
-    return density_map, count
+        density = model(tensor).squeeze().cpu().numpy()
+    density = np.maximum(density, 0)
+    return int(density.sum()), density
 
-def get_status(count):
-    if count < 30:
-        return 'NORMAL',      '#10b981', 'status-normal',      '🟢'
-    elif count < 70:
-        return 'MODERATE',    '#f59e0b', 'status-moderate',    '🟡'
-    elif count < 120:
-        return 'CROWDED',     '#f97316', 'status-crowded',     '🟠'
-    else:
-        return 'OVERCROWDED', '#ef4444', 'status-overcrowded', '🔴'
+def get_alert(count):
+    if   count < 30:  return "🟢 NORMAL",      "#22c55e", "No action required"
+    elif count < 70:  return "🟡 MODERATE",    "#eab308", "Monitor the situation"
+    elif count < 120: return "🟠 CROWDED",     "#f97316", "Deploy crowd management staff"
+    else:             return "🔴 OVERCROWDED", "#ef4444", "Halt platform entry immediately"
 
-def generate_heatmap(image: Image.Image, density_map, count):
-    img_np = np.array(image.convert('RGB'))
-
-    density_map     = np.maximum(density_map, 0)
-    density_resized = cv2.resize(
-        density_map, (img_np.shape[1], img_np.shape[0]))
-    density_resized = np.maximum(density_resized, 0)
-
-    actual_max = density_resized.max()
-
-    if actual_max < 1e-5:
-        # completely empty — all blue
-        density_norm = np.zeros_like(
-            density_resized, dtype=np.uint8)
-
-    elif count < 15:
-        # sparse — gentle normalization, mostly blue
-        density_norm = np.clip(
-            density_resized / actual_max * 80,
-            0, 255).astype(np.uint8)
-
+def normalise(density, count):
+    if density.max() < 1e-8:
+        return np.zeros_like(density, dtype=np.uint8)
+    if count < 15:
+        out = density / density.max() * 80
     elif count < 50:
-        # moderate — medium normalization, warm patches
-        density_norm = np.clip(
-            density_resized / actual_max * 160,
-            0, 255).astype(np.uint8)
-
+        out = density / density.max() * 160
     else:
-        # dense — full normalization, red hotspots
-        p1  = np.percentile(density_resized, 2)
-        p99 = np.percentile(density_resized, 98)
-        density_clipped = np.clip(density_resized, p1, p99)
-        density_norm = ((density_clipped - p1) /
-                        (p99 - p1 + 1e-8) * 255).astype(np.uint8)
+        p2, p98 = np.percentile(density, 2), np.percentile(density, 98)
+        out = np.clip((density - p2) / (p98 - p2 + 1e-8), 0, 1) * 255
+    return out.astype(np.uint8)
 
-    heatmap     = cv2.applyColorMap(density_norm, cv2.COLORMAP_JET)
-    heatmap_rgb = cv2.cvtColor(heatmap, cv2.COLOR_BGR2RGB)
-    overlay     = cv2.addWeighted(img_np, 0.55, heatmap_rgb, 0.45, 0)
+def make_heatmap(pil_img, density, count, alpha):
+    orig = np.array(pil_img.convert("RGB"))
+    h, w = orig.shape[:2]
+    hmap = cv2.resize(density, (w, h))
+    hmap = normalise(hmap, count)
+    colored = cv2.applyColorMap(hmap, cv2.COLORMAP_JET)
+    colored = cv2.cvtColor(colored, cv2.COLOR_BGR2RGB)
+    blended = cv2.addWeighted(orig, 1 - alpha, colored, alpha, 0)
+    return Image.fromarray(blended)
 
-    return density_norm, overlay
+def make_density_vis(density, size):
+    hmap = cv2.resize(density, size)
+    hmap = normalise(hmap, int(density.sum()))
+    colored = cv2.applyColorMap(hmap, cv2.COLORMAP_JET)
+    return Image.fromarray(cv2.cvtColor(colored, cv2.COLOR_BGR2RGB))
 
-# ── UI ────────────────────────────────────────────────────────
-st.markdown(
-    '<div class="hero-title">🚇 Metro Crowd Density Estimator</div>',
-    unsafe_allow_html=True)
-st.markdown(
-    '<div class="hero-sub">CSRNet-based real-time crowd density '
-    'estimation for Indian public transport</div>',
-    unsafe_allow_html=True)
+def get_sample_paths():
+    """Return only the hardcoded Indian metro images, in the defined order."""
+    result = []
+    for label, fname in SAMPLE_IMAGES.items():
+        fpath = os.path.join(VAL_DIR, fname)
+        if os.path.exists(fpath):
+            result.append((label, fpath))
+        else:
+            st.warning(f"Sample not found: {fname} — check the filename in SAMPLE_IMAGES")
+    return result
 
-# ── Sidebar ───────────────────────────────────────────────────
+# ── SIDEBAR ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown('### ⚙️ System Info')
-    st.markdown('<div class="sidebar-metric">🧠 Model: CSRNet v3</div>',
-                unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-metric">📊 Metro MAE: 12.36</div>',
-                unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-metric">📈 Metro MSE: 126.44</div>',
-                unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-metric">🏋️ Epochs: 50</div>',
-                unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-metric">🖼️ Train images: 788</div>',
-                unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-metric">'
-                '&nbsp;&nbsp;&nbsp;├ ShanghaiTech A: 300</div>',
-                unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-metric">'
-                '&nbsp;&nbsp;&nbsp;├ ShanghaiTech B: 400</div>',
-                unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-metric">'
-                '&nbsp;&nbsp;&nbsp;└ Indian Metro: 88</div>',
-                unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-metric">📍 Domain: Indian Metro</div>',
-                unsafe_allow_html=True)
+    st.title("🚇 Crowd Density")
+    st.caption("CSRNet Fine-tuned · Indian Metro · MAE = 12.36")
+    st.markdown("---")
+    alpha = st.slider("Heatmap opacity", 0.10, 0.90, 0.45, 0.05)
+    st.markdown("---")
+    st.markdown("**Alert thresholds**")
+    for label, rng, color in [
+        ("🟢 NORMAL",      "< 30 people",     "#22c55e"),
+        ("🟡 MODERATE",    "30 – 69 people",  "#eab308"),
+        ("🟠 CROWDED",     "70 – 119 people", "#f97316"),
+        ("🔴 OVERCROWDED", "≥ 120 people",    "#ef4444"),
+    ]:
+        st.markdown(
+            f"<span style='color:{color};font-weight:600'>{label}</span>"
+            f"<br><span style='font-size:12px;color:#94a3b8'>{rng}</span>",
+            unsafe_allow_html=True
+        )
+        st.write("")
+    st.markdown("---")
+    st.markdown("**Model checkpoint**")
+    st.code("csrnet_v3_best.pth\nEpoch 14  ·  MAE = 11.30", language=None)
+    st.markdown("---")
+    st.caption("B.Tech CSE · 2025–26\nAbdur Rahman Qasim\nGuide: Dr. Shivani Yadao")
 
-    st.markdown('---')
-    st.markdown('### 🚦 Alert Thresholds')
-    st.markdown('<div class="sidebar-metric">🟢 Normal: 0–29</div>',
-                unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-metric">🟡 Moderate: 30–69</div>',
-                unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-metric">🟠 Crowded: 70–119</div>',
-                unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-metric">🔴 Overcrowded: 120+</div>',
-                unsafe_allow_html=True)
-
-    st.markdown('---')
-    st.markdown('### 📋 Approach Comparison')
-    st.markdown(
-        '<div class="sidebar-metric">❌ CNN Classifier — MAE: ~55</div>',
-        unsafe_allow_html=True)
-    st.markdown(
-        '<div class="sidebar-metric">❌ YOLOv8 — MAE: 283.23</div>',
-        unsafe_allow_html=True)
-    st.markdown(
-        '<div class="sidebar-metric">✅ CSRNet v3 — MAE: 12.36</div>',
-        unsafe_allow_html=True)
-
-    st.markdown('---')
-    st.markdown('### 👨‍💻 Project Info')
-    st.markdown('''
-    **Project #14** — AI/Computer Vision  
-    **Student:** Abdur Rahman Qasim  
-    **Guide:** Dr. Shivani Yadao  
-    **Deadline:** April 15, 2026
-    ''')
-
-# ── Main content ──────────────────────────────────────────────
-model = load_model()
-
-uploaded = st.file_uploader(
-    "Upload a metro/transport crowd image",
-    type=['jpg', 'jpeg', 'png'],
-    help="Upload any crowd image from a metro station, "
-         "bus terminal, or railway platform"
+# ── HEADER ────────────────────────────────────────────────────────────────────
+st.title("🚇 Crowd Density Estimation — Indian Metro")
+st.write(
+    "Real-time crowd density estimation using CSRNet fine-tuned on Indian metro data. "
+    "**Pick a sample image** from the gallery for an instant demo, or upload your own."
 )
+st.markdown("---")
 
-if uploaded is not None:
-    image = Image.open(uploaded).convert('RGB')
+# ── TWO-TAB INPUT ─────────────────────────────────────────────────────────────
+tab_gallery, tab_upload = st.tabs(["📷  Sample Gallery", "⬆️  Upload Your Own"])
 
-    with st.spinner('Analysing crowd density...'):
-        density_map, count       = run_inference(image, model)
-        density_norm, overlay    = generate_heatmap(
-            image, density_map, count)
-        status, color, css_class, emoji = get_status(count)
+selected_pil  = None
+selected_name = None
 
-    # ── Status banner ─────────────────────────────────────────
+# ══════════════════════════════════════
+# TAB 1 — SAMPLE GALLERY
+# ══════════════════════════════════════
+with tab_gallery:
+    sample_paths = get_sample_paths()
+
+    if not sample_paths:
+        st.warning(
+            f"**No images found in `{VAL_DIR}/`.**\n\n"
+            "Make sure your validation images are in that folder. "
+            "Change `VAL_DIR` at the top of `app.py` if they are elsewhere."
+        )
+    else:
+        st.markdown(
+            f"**{len(sample_paths)} sample images** loaded from your validation set — "
+            "click any to run the model instantly."
+        )
+        st.write("")
+
+        cols = st.columns(3)
+
+        for i, (label, fpath) in enumerate(sample_paths):
+            with cols[i % 3]:
+                try:
+                    preview = Image.open(fpath).convert("RGB")
+                    thumb   = preview.copy()
+                    thumb.thumbnail((300, 200))
+                    st.image(thumb, use_container_width=True)
+                except Exception:
+                    st.error(f"Cannot read {fname}")
+                    continue
+
+                if st.button("▶  Run on this image", key=f"s_{i}"):
+                    st.session_state["sel_path"] = fpath
+                    st.session_state["sel_name"] = label
+                    st.session_state.pop("up_img",  None)
+                    st.session_state.pop("up_name", None)
+
+                st.caption(label)
+                st.write("")
+
+        if "sel_path" in st.session_state:
+            try:
+                selected_pil  = Image.open(st.session_state["sel_path"]).convert("RGB")
+                selected_name = st.session_state.get("sel_name", "Sample image")
+                st.success(f"✅ Selected: **{selected_name}**")
+            except Exception as e:
+                st.error(f"Could not load: {e}")
+
+# ══════════════════════════════════════
+# TAB 2 — UPLOAD
+# ══════════════════════════════════════
+with tab_upload:
+    st.markdown("Upload any metro platform or crowd image.")
+    uploaded = st.file_uploader(
+        "Choose an image",
+        type=["jpg", "jpeg", "png"],
+        label_visibility="collapsed"
+    )
+    if uploaded is not None:
+        selected_pil  = Image.open(uploaded).convert("RGB")
+        selected_name = uploaded.name
+        st.session_state.pop("sel_path", None)
+        st.session_state.pop("sel_name", None)
+        st.success(f"✅ Loaded: **{uploaded.name}**")
+
+# ── INFERENCE + OUTPUT ────────────────────────────────────────────────────────
+if selected_pil is not None:
+    st.markdown("---")
+
+    with st.spinner("Loading model…"):
+        model, device = load_model()
+
+    with st.spinner("Running CSRNet inference…"):
+        count, density = predict(model, device, selected_pil)
+
+    alert_label, alert_color, alert_action = get_alert(count)
+    capacity = min(int(count / 200 * 100), 100)
+
+    # Alert banner
     st.markdown(
-        f'<div class="{css_class}">'
-        f'{emoji} &nbsp; {status} &nbsp;|&nbsp; '
-        f'{count} people detected</div>',
-        unsafe_allow_html=True)
+        f"""
+        <div style="
+            background:{alert_color}15;border:2px solid {alert_color};
+            border-radius:12px;padding:18px 28px;
+            display:flex;align-items:center;gap:32px;margin-bottom:20px;">
+            <div style="font-size:30px;font-weight:900;color:{alert_color};
+                        white-space:nowrap">{alert_label}</div>
+            <div>
+                <div style="font-size:11px;color:#94a3b8;
+                            text-transform:uppercase;letter-spacing:.08em">
+                    Recommended action
+                </div>
+                <div style="font-size:17px;font-weight:600;color:#1e293b">
+                    {alert_action}
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True
+    )
 
-    st.markdown('<br>', unsafe_allow_html=True)
+    # KPI row
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Estimated count",   f"{count} people")
+    k2.metric("Platform capacity", f"{capacity}%",
+              delta="Safe" if count < 70 else "⚠ At risk",
+              delta_color="normal" if count < 70 else "inverse")
+    k3.metric("Alert level",       alert_label.split(" ")[1])
+    k4.metric("Device",            str(device).upper())
 
-    # ── Metrics row ───────────────────────────────────────────
-    c1, c2, c3, c4 = st.columns(4)
+    # Three-panel output
+    st.markdown("#### Visual output")
+    c1, c2, c3 = st.columns(3)
+
     with c1:
-        st.markdown(
-            f'<div class="metric-card">'
-            f'<div class="metric-value" style="color:{color}">'
-            f'{count}</div>'
-            f'<div class="metric-label">People Detected</div>'
-            f'</div>', unsafe_allow_html=True)
+        st.markdown("**Original**")
+        st.image(selected_pil, use_container_width=True)
+
     with c2:
-        density_pct = min(int(count / 200 * 100), 100)
-        st.markdown(
-            f'<div class="metric-card">'
-            f'<div class="metric-value" style="color:{color}">'
-            f'{density_pct}%</div>'
-            f'<div class="metric-label">Capacity Used</div>'
-            f'</div>', unsafe_allow_html=True)
+        st.markdown("**Density map**")
+        st.image(make_density_vis(density, selected_pil.size), use_container_width=True)
+        st.caption("🔵 Sparse → 🟢 Moderate → 🔴 Dense")
+
     with c3:
-        st.markdown(
-            f'<div class="metric-card">'
-            f'<div class="metric-value" style="color:#60a5fa">'
-            f'12.36</div>'
-            f'<div class="metric-label">Model MAE</div>'
-            f'</div>', unsafe_allow_html=True)
-    with c4:
-        img_w, img_h = image.size
-        st.markdown(
-            f'<div class="metric-card">'
-            f'<div class="metric-value" '
-            f'style="color:#a78bfa;font-size:1.4rem">'
-            f'{img_w}×{img_h}</div>'
-            f'<div class="metric-label">Image Resolution</div>'
-            f'</div>', unsafe_allow_html=True)
+        st.markdown("**Heatmap overlay**")
+        st.image(make_heatmap(selected_pil, density, count, alpha), use_container_width=True)
+        st.caption(f"Opacity {alpha:.0%} · adjust in sidebar")
 
-    st.markdown('<br>', unsafe_allow_html=True)
-
-    # ── Image panels ──────────────────────────────────────────
-    st.markdown(
-        '<div class="section-header">📸 Analysis Output</div>',
-        unsafe_allow_html=True)
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.markdown('**Original Image**')
-        st.image(image, use_container_width=True)
-
-    with col2:
-        st.markdown('**Density Map**')
-        fig, ax = plt.subplots(figsize=(5, 4))
-        fig.patch.set_facecolor('#111827')
-        ax.set_facecolor('#111827')
-        im = ax.imshow(density_norm, cmap='jet')
-        plt.colorbar(im, ax=ax, fraction=0.046,
-                     label='Crowd Density')
-        ax.set_title('Heat intensity = crowd concentration',
-                     color='#9ca3af', fontsize=8, pad=6)
-        ax.axis('off')
-        st.pyplot(fig)
-        plt.close()
-
-    with col3:
-        st.markdown('**Heatmap Overlay**')
-        st.image(overlay, use_container_width=True)
-
-    # ── Density distribution chart ────────────────────────────
-    st.markdown('<br>', unsafe_allow_html=True)
-    st.markdown(
-        '<div class="section-header">'
-        '📊 Density Distribution Analysis</div>',
-        unsafe_allow_html=True)
-
-    col_a, col_b = st.columns([2, 1])
+    # Extras
+    col_a, col_b = st.columns(2)
 
     with col_a:
-        flat     = density_map.flatten()
-        flat_pos = flat[flat > 0.01]
-        if len(flat_pos) > 0:
-            fig2, ax2 = plt.subplots(figsize=(8, 3))
-            fig2.patch.set_facecolor('#111827')
-            ax2.set_facecolor('#1f2937')
-            ax2.hist(flat_pos, bins=50, color='#60a5fa',
-                     edgecolor='none', alpha=0.8)
-            ax2.set_xlabel('Density Value', color='#9ca3af')
-            ax2.set_ylabel('Pixel Count',   color='#9ca3af')
-            ax2.set_title(
-                'Distribution of Crowd Density Values',
-                color='#e5e7eb', fontsize=10)
-            ax2.tick_params(colors='#6b7280')
-            for spine in ax2.spines.values():
-                spine.set_color('#374151')
-            st.pyplot(fig2)
-            plt.close()
-        else:
-            st.info('No significant crowd density detected.')
+        with st.expander("📊 Density distribution", expanded=False):
+            import matplotlib.pyplot as plt
+            fig, ax = plt.subplots(figsize=(6, 2.2))
+            flat = density.flatten()
+            flat = flat[flat > flat.max() * 0.02]
+            ax.hist(flat, bins=40, color="#3b82f6", alpha=0.8, edgecolor="white")
+            ax.set_xlabel("Density value", fontsize=9)
+            ax.set_ylabel("Pixel count",   fontsize=9)
+            ax.spines[["top", "right"]].set_visible(False)
+            ax.tick_params(labelsize=8)
+            st.pyplot(fig)
+            plt.close(fig)
 
     with col_b:
-        st.markdown('<br>', unsafe_allow_html=True)
-        peak_val = float(density_map.max())
-        active   = int((density_map > 0.01).sum())
-        mean_val = float(density_map[density_map > 0.01].mean()
-                         if active > 0 else 0)
-        st.markdown(
-            f'<div class="info-box">'
-            f'🔺 Peak density: <b>{peak_val:.3f}</b><br>'
-            f'📊 Mean density: <b>{mean_val:.3f}</b><br>'
-            f'🗺️ Active pixels: <b>{active}</b><br>'
-            f'📐 Map size: <b>64×64</b>'
-            f'</div>', unsafe_allow_html=True)
+        with st.expander("📈 Model comparison", expanded=False):
+            import pandas as pd
+            df = pd.DataFrame([
+                {"Approach": "CNN Classifier",           "MAE": "~55",    "Density Map": "❌", "Verdict": "Failed"},
+                {"Approach": "YOLOv8",                   "MAE": "283.23", "Density Map": "❌", "Verdict": "Failed"},
+                {"Approach": "CSRNet Pretrained",         "MAE": "~50",    "Density Map": "✅", "Verdict": "Baseline"},
+                {"Approach": "CSRNet Fine-tuned (this)",  "MAE": "12.36",  "Density Map": "✅", "Verdict": "🏆 Best"},
+            ])
+            st.dataframe(df, use_container_width=True, hide_index=True)
+            st.caption("95.6% more accurate than YOLOv8 · 75.3% better than pretrained baseline")
 
-    # ── Recommendation ────────────────────────────────────────
-    st.markdown('<br>', unsafe_allow_html=True)
-    if status == 'NORMAL':
-        st.success(
-            '✅ Platform is within safe capacity. '
-            'No action required.')
-    elif status == 'MODERATE':
-        st.warning(
-            '⚠️ Moderate crowd detected. '
-            'Monitor the situation.')
-    elif status == 'CROWDED':
-        st.warning(
-            '🟠 Platform is crowded. Consider '
-            'crowd management measures.')
-    else:
-        st.error(
-            '🚨 OVERCROWDING ALERT! Immediate crowd '
-            'management required. Consider halting entry.')
-
+# ── EMPTY STATE ───────────────────────────────────────────────────────────────
 else:
-    # ── Empty state ───────────────────────────────────────────
-    st.markdown('<br>', unsafe_allow_html=True)
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown('''
-        <div class="metric-card">
-            <div class="metric-value" style="color:#60a5fa">788</div>
-            <div class="metric-label">Training Images</div>
-        </div>''', unsafe_allow_html=True)
-    with col2:
-        st.markdown('''
-        <div class="metric-card">
-            <div class="metric-value" style="color:#34d399">12.36</div>
-            <div class="metric-label">Metro MAE</div>
-        </div>''', unsafe_allow_html=True)
-    with col3:
-        st.markdown('''
-        <div class="metric-card">
-            <div class="metric-value" style="color:#a78bfa">50</div>
-            <div class="metric-label">Training Epochs</div>
-        </div>''', unsafe_allow_html=True)
-
-    st.markdown('<br>', unsafe_allow_html=True)
-    st.markdown('''
-    <div class="info-box" style="text-align:center; padding: 2rem;">
-        👆 Upload a metro or transport crowd image above
-        to get started<br><br>
-        <span style="color:#6b7280; font-size:0.85rem">
-        Supports JPG, JPEG, PNG • Any resolution
-        </span>
-    </div>
-    ''', unsafe_allow_html=True)
+    st.markdown("### 👆 Select a sample above, or switch to Upload to use your own image")
+    st.write("")
+    a1, a2, a3, a4 = st.columns(4)
+    for col, (label, rng, color, action) in zip(
+        [a1, a2, a3, a4],
+        [
+            ("🟢 NORMAL",      "< 30",   "#22c55e", "No action required"),
+            ("🟡 MODERATE",    "30–69",  "#eab308", "Monitor situation"),
+            ("🟠 CROWDED",     "70–119", "#f97316", "Deploy staff"),
+            ("🔴 OVERCROWDED", "≥ 120",  "#ef4444", "Halt entry"),
+        ]
+    ):
+        col.markdown(
+            f"""<div style="background:{color}12;border:1.5px solid {color};
+                border-radius:10px;padding:14px;text-align:center;">
+                <div style="font-size:13px;font-weight:700;color:{color}">{label}</div>
+                <div style="font-size:20px;font-weight:800;color:{color};margin:6px 0">{rng}</div>
+                <div style="font-size:11px;color:#94a3b8">{action}</div>
+            </div>""",
+            unsafe_allow_html=True
+        )
