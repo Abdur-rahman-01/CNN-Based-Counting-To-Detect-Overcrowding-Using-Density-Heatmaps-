@@ -25,37 +25,39 @@ st.set_page_config(
 
 # ── PATHS ─────────────────────────────────────────────────────────────────────
 WEIGHTS_PATH = "weights/csrnet_v3_best.pth"
-VAL_DIR      = "my_data/val/images"   # your val images already live here
-SAMPLE_IMAGES = {
-    "Ameerpet — Peak Hour":      "Screenshot 2026-03-30 003200.png",
-    "Raidurg — Platform ":  "Screenshot 2026-03-30 023136.png",
-    "Mumbai Central — Boarding": "Screenshot 2026-03-30 001150.png",
-    "Red Line — Pre-boarding":   "Screenshot 2026-03-30 003624.png",
-    "Metro Corridor — Off-peak": "Screenshot 2026-03-30 013249.png",
-}
+VAL_DIR = "my_data/val/images"
+SAMPLE_LABELS = [
+    "Ameerpet — Peak Hour",
+    "Raidurg — Platform",
+    "Mumbai Central — Boarding",
+    "Red Line — Pre-boarding",
+    "Metro Corridor — Off-peak",
+]
 
-MAX_SAMPLES  = 3                  # max images to show in gallery
+MAX_SAMPLES = 3  # max images to show in gallery
 
 # ── TRANSFORMS ────────────────────────────────────────────────────────────────
-transform = transforms.Compose([
-    transforms.Resize((512, 512)),
-    transforms.ToTensor(),
-    transforms.Normalize(
-        mean=[0.485, 0.456, 0.406],
-        std =[0.229, 0.224, 0.225]
-    ),
-])
+transform = transforms.Compose(
+    [
+        transforms.Resize((512, 512)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ]
+)
+
 
 # ── MODEL ─────────────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
     from model import CSRNet
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model  = CSRNet()
+    model = CSRNet()
     model.load_state_dict(torch.load(WEIGHTS_PATH, map_location=device))
     model.to(device)
     model.eval()
     return model, device
+
 
 # ── HELPERS ───────────────────────────────────────────────────────────────────
 def predict(model, device, pil_img):
@@ -65,11 +67,17 @@ def predict(model, device, pil_img):
     density = np.maximum(density, 0)
     return int(density.sum()), density
 
+
 def get_alert(count):
-    if   count < 30:  return "🟢 NORMAL",      "#22c55e", "No action required"
-    elif count < 70:  return "🟡 MODERATE",    "#eab308", "Monitor the situation"
-    elif count < 120: return "🟠 CROWDED",     "#f97316", "Deploy crowd management staff"
-    else:             return "🔴 OVERCROWDED", "#ef4444", "Halt platform entry immediately"
+    if count < 30:
+        return "🟢 NORMAL", "#22c55e", "No action required"
+    elif count < 70:
+        return "🟡 MODERATE", "#eab308", "Monitor the situation"
+    elif count < 120:
+        return "🟠 CROWDED", "#f97316", "Deploy crowd management staff"
+    else:
+        return "🔴 OVERCROWDED", "#ef4444", "Halt platform entry immediately"
+
 
 def normalise(density, count):
     if density.max() < 1e-8:
@@ -83,6 +91,7 @@ def normalise(density, count):
         out = np.clip((density - p2) / (p98 - p2 + 1e-8), 0, 1) * 255
     return out.astype(np.uint8)
 
+
 def make_heatmap(pil_img, density, count, alpha):
     orig = np.array(pil_img.convert("RGB"))
     h, w = orig.shape[:2]
@@ -93,22 +102,31 @@ def make_heatmap(pil_img, density, count, alpha):
     blended = cv2.addWeighted(orig, 1 - alpha, colored, alpha, 0)
     return Image.fromarray(blended)
 
+
 def make_density_vis(density, size):
     hmap = cv2.resize(density, size)
     hmap = normalise(hmap, int(density.sum()))
     colored = cv2.applyColorMap(hmap, cv2.COLORMAP_JET)
     return Image.fromarray(cv2.cvtColor(colored, cv2.COLOR_BGR2RGB))
 
+
 def get_sample_paths():
-    """Return only the hardcoded Indian metro images, in the defined order."""
+    """Dynamically load images from VAL_DIR."""
+    if not os.path.exists(VAL_DIR):
+        return []
+
+    valid_exts = (".png", ".jpg", ".jpeg")
+    all_images = sorted(
+        [f for f in os.listdir(VAL_DIR) if f.lower().endswith(valid_exts)]
+    )
+
     result = []
-    for label, fname in SAMPLE_IMAGES.items():
+    for i, fname in enumerate(all_images[: MAX_SAMPLES * 3]):
         fpath = os.path.join(VAL_DIR, fname)
-        if os.path.exists(fpath):
-            result.append((label, fpath))
-        else:
-            st.warning(f"Sample not found: {fname} — check the filename in SAMPLE_IMAGES")
+        label = SAMPLE_LABELS[i] if i < len(SAMPLE_LABELS) else fname
+        result.append((label, fpath))
     return result
+
 
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -119,15 +137,15 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("**Alert thresholds**")
     for label, rng, color in [
-        ("🟢 NORMAL",      "< 30 people",     "#22c55e"),
-        ("🟡 MODERATE",    "30 – 69 people",  "#eab308"),
-        ("🟠 CROWDED",     "70 – 119 people", "#f97316"),
-        ("🔴 OVERCROWDED", "≥ 120 people",    "#ef4444"),
+        ("🟢 NORMAL", "< 30 people", "#22c55e"),
+        ("🟡 MODERATE", "30 – 69 people", "#eab308"),
+        ("🟠 CROWDED", "70 – 119 people", "#f97316"),
+        ("🔴 OVERCROWDED", "≥ 120 people", "#ef4444"),
     ]:
         st.markdown(
             f"<span style='color:{color};font-weight:600'>{label}</span>"
             f"<br><span style='font-size:12px;color:#94a3b8'>{rng}</span>",
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )
         st.write("")
     st.markdown("---")
@@ -147,7 +165,7 @@ st.markdown("---")
 # ── TWO-TAB INPUT ─────────────────────────────────────────────────────────────
 tab_gallery, tab_upload = st.tabs(["📷  Sample Gallery", "⬆️  Upload Your Own"])
 
-selected_pil  = None
+selected_pil = None
 selected_name = None
 
 # ══════════════════════════════════════
@@ -175,7 +193,7 @@ with tab_gallery:
             with cols[i % 3]:
                 try:
                     preview = Image.open(fpath).convert("RGB")
-                    thumb   = preview.copy()
+                    thumb = preview.copy()
                     thumb.thumbnail((300, 200))
                     st.image(thumb, use_container_width=True)
                 except Exception:
@@ -185,7 +203,7 @@ with tab_gallery:
                 if st.button("▶  Run on this image", key=f"s_{i}"):
                     st.session_state["sel_path"] = fpath
                     st.session_state["sel_name"] = label
-                    st.session_state.pop("up_img",  None)
+                    st.session_state.pop("up_img", None)
                     st.session_state.pop("up_name", None)
 
                 st.caption(label)
@@ -193,7 +211,7 @@ with tab_gallery:
 
         if "sel_path" in st.session_state:
             try:
-                selected_pil  = Image.open(st.session_state["sel_path"]).convert("RGB")
+                selected_pil = Image.open(st.session_state["sel_path"]).convert("RGB")
                 selected_name = st.session_state.get("sel_name", "Sample image")
                 st.success(f"✅ Selected: **{selected_name}**")
             except Exception as e:
@@ -205,12 +223,10 @@ with tab_gallery:
 with tab_upload:
     st.markdown("Upload any metro platform or crowd image.")
     uploaded = st.file_uploader(
-        "Choose an image",
-        type=["jpg", "jpeg", "png"],
-        label_visibility="collapsed"
+        "Choose an image", type=["jpg", "jpeg", "png"], label_visibility="collapsed"
     )
     if uploaded is not None:
-        selected_pil  = Image.open(uploaded).convert("RGB")
+        selected_pil = Image.open(uploaded).convert("RGB")
         selected_name = uploaded.name
         st.session_state.pop("sel_path", None)
         st.session_state.pop("sel_name", None)
@@ -248,17 +264,21 @@ if selected_pil is not None:
                 </div>
             </div>
         </div>
-        """, unsafe_allow_html=True
+        """,
+        unsafe_allow_html=True,
     )
 
     # KPI row
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Estimated count",   f"{count} people")
-    k2.metric("Platform capacity", f"{capacity}%",
-              delta="Safe" if count < 70 else "⚠ At risk",
-              delta_color="normal" if count < 70 else "inverse")
-    k3.metric("Alert level",       alert_label.split(" ")[1])
-    k4.metric("Device",            str(device).upper())
+    k1.metric("Estimated count", f"{count} people")
+    k2.metric(
+        "Platform capacity",
+        f"{capacity}%",
+        delta="Safe" if count < 70 else "⚠ At risk",
+        delta_color="normal" if count < 70 else "inverse",
+    )
+    k3.metric("Alert level", alert_label.split(" ")[1])
+    k4.metric("Device", str(device).upper())
 
     # Three-panel output
     st.markdown("#### Visual output")
@@ -275,7 +295,9 @@ if selected_pil is not None:
 
     with c3:
         st.markdown("**Heatmap overlay**")
-        st.image(make_heatmap(selected_pil, density, count, alpha), use_container_width=True)
+        st.image(
+            make_heatmap(selected_pil, density, count, alpha), use_container_width=True
+        )
         st.caption(f"Opacity {alpha:.0%} · adjust in sidebar")
 
     # Extras
@@ -284,12 +306,13 @@ if selected_pil is not None:
     with col_a:
         with st.expander("📊 Density distribution", expanded=False):
             import matplotlib.pyplot as plt
+
             fig, ax = plt.subplots(figsize=(6, 2.2))
             flat = density.flatten()
             flat = flat[flat > flat.max() * 0.02]
             ax.hist(flat, bins=40, color="#3b82f6", alpha=0.8, edgecolor="white")
             ax.set_xlabel("Density value", fontsize=9)
-            ax.set_ylabel("Pixel count",   fontsize=9)
+            ax.set_ylabel("Pixel count", fontsize=9)
             ax.spines[["top", "right"]].set_visible(False)
             ax.tick_params(labelsize=8)
             st.pyplot(fig)
@@ -298,28 +321,55 @@ if selected_pil is not None:
     with col_b:
         with st.expander("📈 Model comparison", expanded=False):
             import pandas as pd
-            df = pd.DataFrame([
-                {"Approach": "CNN Classifier",           "MAE": "~55",    "Density Map": "❌", "Verdict": "Failed"},
-                {"Approach": "YOLOv8",                   "MAE": "283.23", "Density Map": "❌", "Verdict": "Failed"},
-                {"Approach": "CSRNet Pretrained",         "MAE": "~50",    "Density Map": "✅", "Verdict": "Baseline"},
-                {"Approach": "CSRNet Fine-tuned (this)",  "MAE": "12.36",  "Density Map": "✅", "Verdict": "🏆 Best"},
-            ])
+
+            df = pd.DataFrame(
+                [
+                    {
+                        "Approach": "CNN Classifier",
+                        "MAE": "~55",
+                        "Density Map": "❌",
+                        "Verdict": "Failed",
+                    },
+                    {
+                        "Approach": "YOLOv8",
+                        "MAE": "283.23",
+                        "Density Map": "❌",
+                        "Verdict": "Failed",
+                    },
+                    {
+                        "Approach": "CSRNet Pretrained",
+                        "MAE": "~50",
+                        "Density Map": "✅",
+                        "Verdict": "Baseline",
+                    },
+                    {
+                        "Approach": "CSRNet Fine-tuned (this)",
+                        "MAE": "12.36",
+                        "Density Map": "✅",
+                        "Verdict": "🏆 Best",
+                    },
+                ]
+            )
             st.dataframe(df, use_container_width=True, hide_index=True)
-            st.caption("95.6% more accurate than YOLOv8 · 75.3% better than pretrained baseline")
+            st.caption(
+                "95.6% more accurate than YOLOv8 · 75.3% better than pretrained baseline"
+            )
 
 # ── EMPTY STATE ───────────────────────────────────────────────────────────────
 else:
-    st.markdown("### 👆 Select a sample above, or switch to Upload to use your own image")
+    st.markdown(
+        "### 👆 Select a sample above, or switch to Upload to use your own image"
+    )
     st.write("")
     a1, a2, a3, a4 = st.columns(4)
     for col, (label, rng, color, action) in zip(
         [a1, a2, a3, a4],
         [
-            ("🟢 NORMAL",      "< 30",   "#22c55e", "No action required"),
-            ("🟡 MODERATE",    "30–69",  "#eab308", "Monitor situation"),
-            ("🟠 CROWDED",     "70–119", "#f97316", "Deploy staff"),
-            ("🔴 OVERCROWDED", "≥ 120",  "#ef4444", "Halt entry"),
-        ]
+            ("🟢 NORMAL", "< 30", "#22c55e", "No action required"),
+            ("🟡 MODERATE", "30–69", "#eab308", "Monitor situation"),
+            ("🟠 CROWDED", "70–119", "#f97316", "Deploy staff"),
+            ("🔴 OVERCROWDED", "≥ 120", "#ef4444", "Halt entry"),
+        ],
     ):
         col.markdown(
             f"""<div style="background:{color}12;border:1.5px solid {color};
@@ -328,5 +378,5 @@ else:
                 <div style="font-size:20px;font-weight:800;color:{color};margin:6px 0">{rng}</div>
                 <div style="font-size:11px;color:#94a3b8">{action}</div>
             </div>""",
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )

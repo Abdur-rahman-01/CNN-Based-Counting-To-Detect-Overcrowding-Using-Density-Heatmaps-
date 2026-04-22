@@ -18,10 +18,12 @@ build/
 *.npy
 *.mat
 
-# Images
+# Images (except validation data)
 *.jpg
 *.jpeg
 *.png
+!my_data/val/images/*.png
+!my_data/val/images/*.jpg
 
 # IDE
 .vscode/
