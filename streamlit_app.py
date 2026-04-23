@@ -25,16 +25,16 @@ st.set_page_config(
 
 # ── PATHS ─────────────────────────────────────────────────────────────────────
 WEIGHTS_PATH = "weights/csrnet_v3_best.pth"
-VAL_DIR = "my_data/val/images"
-SAMPLE_LABELS = [
-    "Ameerpet — Peak Hour",
-    "Raidurg — Platform",
-    "Mumbai Central — Boarding",
-    "Red Line — Pre-boarding",
-    "Metro Corridor — Off-peak",
-]
+VAL_DIR = "my_data/val/images"  # your val images already live here
+SAMPLE_IMAGES = {
+    "Ameerpet — Peak Hour": "Screenshot 2026-03-30 003200.png",
+    "Raidurg — Platform ": "Screenshot 2026-03-30 023136.png",
+    "Mumbai Central — Boarding": "Screenshot 2026-03-30 001150.png",
+    "Red Line — Pre-boarding": "Screenshot 2026-03-30 003624.png",
+    "Metro Corridor — Off-peak": "Screenshot 2026-03-30 013249.png",
+}
 
-MAX_SAMPLES = 3  # max images to show in gallery
+MAX_SAMPLES = 5  # max images to show in gallery
 
 # ── TRANSFORMS ────────────────────────────────────────────────────────────────
 transform = transforms.Compose(
@@ -111,21 +111,15 @@ def make_density_vis(density, size):
 
 
 def get_sample_paths():
-    """Dynamically load images from VAL_DIR."""
-    if not os.path.exists(VAL_DIR):
-        return []
-
-    valid_exts = (".png", ".jpg", ".jpeg")
-    all_images = sorted(
-        [f for f in os.listdir(VAL_DIR) if f.lower().endswith(valid_exts)]
-    )
-
+    """Return only the hardcoded Indian metro images defined in SAMPLE_IMAGES dict."""
     result = []
-    for i, fname in enumerate(all_images[: MAX_SAMPLES * 3]):
+    for label, fname in SAMPLE_IMAGES.items():
         fpath = os.path.join(VAL_DIR, fname)
-        label = SAMPLE_LABELS[i] if i < len(SAMPLE_LABELS) else fname
-        result.append((label, fpath))
-    return result
+        if os.path.exists(fpath):
+            result.append((label, fpath))
+        else:
+            st.warning(f"Sample not found: {fname}")
+    return result[:MAX_SAMPLES]
 
 
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
@@ -197,7 +191,7 @@ with tab_gallery:
                     thumb.thumbnail((300, 200))
                     st.image(thumb, use_container_width=True)
                 except Exception:
-                    st.error(f"Cannot read {fname}")
+                    st.error(f"Cannot read {fpath}")
                     continue
 
                 if st.button("▶  Run on this image", key=f"s_{i}"):
